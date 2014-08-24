@@ -1,0 +1,43 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+}
+
+apply plugin: 'groovy'
+
+group = 'com.vokal.gradle.play'
+version = '0.1.0'
+
+dependencies {
+
+    repositories {
+        mavenCentral()
+    }
+
+    compile gradleApi()
+    compile localGroovy()
+
+    compile 'com.android.tools.build:gradle:0.12.+'
+
+    compile 'com.google.apis:google-api-services-androidpublisher:v2-rev2-1.19.0'
+    compile 'com.google.oauth-client:google-oauth-client-java6:1.19.0'
+    compile 'com.google.oauth-client:google-oauth-client-jetty:1.19.0'
+    compile 'com.google.api-client:google-api-client-gson:1.19.0'
+}
+
+ext {
+    sourceCompatibility = 1.6
+    targetCompatibility = 1.6
+    artifactId = 'play'
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Google Play Publish Gradle Plugin',
+                'Implementation-Version': version,
+                'Built-By': System.getProperty("user.name"),
+                'Built-Date': new Date(),
+                'Built-JDK': System.getProperty("java.version")
+    }
+}
