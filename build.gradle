@@ -6,8 +6,8 @@ buildscript {
 
 apply plugin: 'groovy'
 
-group = 'com.vokal.gradle.play'
-version = '0.1.0'
+group = 'com.vokalinteractive.gradle'
+version = '0.1.1-SNAPSHOT'
 
 dependencies {
 
