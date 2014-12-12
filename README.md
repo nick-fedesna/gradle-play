@@ -6,10 +6,10 @@ Gradle plugin for publishing Android applications using the Google Play Publishe
 ````
 buildscript {
     dependencies {
-        classpath 'com.android.tools.build:gradle:0.12.+'
+        classpath 'com.android.tools.build:gradle:1.0.0'
         ...
         
-        classpath files('libraries/gradle-play-0.1.1-SNAPSHOT.jar')
+        classpath files('libraries/gradle-play-0.1.2-SNAPSHOT.jar')
         classpath 'com.google.apis:google-api-services-androidpublisher:v2-rev2-1.19.0'
         classpath 'com.google.api-client:google-api-client-gson:1.19.0'
         classpath 'com.google.oauth-client:google-oauth-client-java6:1.19.0'
@@ -18,7 +18,7 @@ buildscript {
 }
 
 apply plugin: 'com.android.application'
-apply plugin: 'play'
+apply plugin: 'io.vokal.gradle.play'
 
 android {
     ...
