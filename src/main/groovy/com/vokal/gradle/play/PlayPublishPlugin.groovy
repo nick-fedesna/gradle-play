@@ -2,6 +2,7 @@ package com.vokal.gradle.play
 
 import com.android.builder.core.DefaultBuildType
 import com.android.builder.core.DefaultProductFlavor
+import com.android.builder.model.BuildType
 import com.google.api.client.http.AbstractInputStreamContent
 import com.google.api.client.http.FileContent
 import com.google.api.services.androidpublisher.AndroidPublisher
@@ -13,8 +14,6 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Tracks.Up
 import com.google.api.services.androidpublisher.model.Apk
 import com.google.api.services.androidpublisher.model.AppEdit
 import com.google.api.services.androidpublisher.model.Track
-import com.google.common.base.CaseFormat
-import com.google.common.collect.Lists
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -47,7 +46,7 @@ class PlayPublishPlugin implements Plugin<Project> {
     HashMap<String, List<AppVariant>> appVariants = new HashMap<>()
 
     String getName() {
-        return "play"
+        return "io.vokal.gradle.play"
     }
 
     void apply(Project project) {
@@ -200,7 +199,7 @@ class PlayPublishPlugin implements Plugin<Project> {
     }
 
     void configureVariant(def variant) {
-        DefaultBuildType buildType = variant.buildType
+        BuildType buildType = variant.buildType
         DefaultProductFlavor flavor = variant.mergedFlavor
         String appId = flavor.applicationId
         if (buildType.applicationIdSuffix != null)
@@ -209,7 +208,7 @@ class PlayPublishPlugin implements Plugin<Project> {
         AppVariant pub = new AppVariant();
         pub.name = variant.name
         pub.flavor = flavor
-        pub.output = variant.outputFile
+        pub.output = variant.outputs[0].outputFile
         pub.version = flavor.versionName
         if (buildType.versionNameSuffix != null)
             pub.version += buildType.versionNameSuffix
@@ -217,7 +216,9 @@ class PlayPublishPlugin implements Plugin<Project> {
         if (appVariants.containsKey(appId)) {
             appVariants.get(appId).add(pub)
         } else {
-            appVariants.put(appId, Lists.newArrayList(pub))
+            List<AppVariant> list = new ArrayList<AppVariant>()
+            list.add(pub)
+            appVariants.put(appId, list)
         }
 
     }
