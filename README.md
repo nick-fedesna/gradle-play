@@ -2,7 +2,15 @@
 
 Gradle plugin for publishing Android applications using the Google Play Publisher API
 
-## build.gradle
+## Building
+
+- clone repository
+- execute `./gradlew assemble`
+- copy __build/libs/play-0.1.2-SNAPSHOT.jar__ to your project (libraries subfolder used as example below)
+
+## Usage
+
+### build.gradle
 ````
 buildscript {
     dependencies {
@@ -44,7 +52,7 @@ play {
 ````
 (eg. might build _freeX86Release, freeArmRelease, paidX86Release, paidArmRelease_ variants)
 
-## gradle tasks
+### gradle tasks
 ````
 playInfo - displays publishing info grouped by application
 playPublish - publishes all configured applications
