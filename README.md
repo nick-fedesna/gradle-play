@@ -28,7 +28,7 @@ apply plugin: 'com.android.application'
 apply plugin: 'io.vokal.gradle.play'
 
 android {
-    ...
+    …
 }
 
 play {
