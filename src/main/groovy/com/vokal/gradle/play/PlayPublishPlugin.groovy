@@ -1,5 +1,6 @@
 package com.vokal.gradle.play
 
+import com.android.builder.core.DefaultBuildType
 import com.android.builder.core.DefaultProductFlavor
 import com.google.api.client.http.AbstractInputStreamContent
 import com.google.api.client.http.FileContent
@@ -12,6 +13,8 @@ import com.google.api.services.androidpublisher.AndroidPublisher.Edits.Tracks.Up
 import com.google.api.services.androidpublisher.model.Apk
 import com.google.api.services.androidpublisher.model.AppEdit
 import com.google.api.services.androidpublisher.model.Track
+import com.google.common.base.CaseFormat
+import com.google.common.collect.Lists
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -31,8 +34,11 @@ class PlayPublishPlugin implements Plugin<Project> {
     private static final String TRACK_ALPHA = "alpha";
 
     private static class AppVariant {
-        DefaultProductFlavor flavor;
+        String name;
+        String version;
+
         File output;
+        def flavor;
     }
 
     Project       project;
@@ -50,7 +56,7 @@ class PlayPublishPlugin implements Plugin<Project> {
         project.extensions.create("play", PublishConfig);
 
         project.task('playInfo') << {
-            printInfo()
+            printInfo(null)
         }
 
         def hasApp = project.hasProperty('android')
@@ -66,30 +72,85 @@ class PlayPublishPlugin implements Plugin<Project> {
                 return
             }
 
-            project.android['applicationVariants'].all { variant ->
-                if (playConfig.publishVariants.contains(variant.name)) {
-                    if (!variant.buildType.debuggable) {
-                        configureVariant(variant)
-                    } else {
-                        println "Cannot publish debug variant: ${variant.name}"
+            playConfig.publishVariants.each { publishVariant ->
+                String capVariant = publishVariant.capitalize()
+                project.android['applicationVariants'].all { variant ->
+                    if (variant.name == publishVariant || variant.name.endsWith(capVariant)) {
+                        if (!variant.buildType.debuggable) {
+                            configureVariant(variant)
+                        }
+                    }
+                }
+            }
+
+            if (appVariants.size() > 0) {
+                Task allTask = project.task('playPublish') << {
+                    for (String appId : appVariants.keySet()) {
+                        printInfo(appId)
+                        publishApk(appId)
+                    }
+                }
+
+                for (Map.Entry<String, List<AppVariant>> app : appVariants.entrySet()) {
+                    String appId = app.key
+                    List<AppVariant> variants = app.value
+                    boolean single = variants.size() == 1
+                    boolean multi = variants.size() > 1
+
+                    List<String> dependsOnSuffixes = new ArrayList<>()
+                    variants.each { v ->
+                        dependsOnSuffixes.add(v.name.capitalize())
+                    }
+
+                    String taskSuffix = ""
+                    if (single) {
+                        taskSuffix = dependsOnSuffixes.get(0)
+                    } else if (multi) {
+                        app.key.split("\\.").each { part ->
+                            taskSuffix += part.capitalize()
+                        }
+//                        TODO: find common parts and use those for suffix
+//                        dependsOnSuffixes.each { d ->
+//                            def p = CaseFormat.LOWER_CAMEL.to(CaseFormat.LOWER_UNDERSCORE, d).split("_")
+//                        }
+                    }
+                    if (!taskSuffix.empty) {
+                        Task task = project.task("playPublish${taskSuffix}") << {
+                            printInfo(appId)
+                            publishApk(appId)
+                        }
+
+                        dependsOnSuffixes.each { variant ->
+                            task.dependsOn('assemble' + variant)
+                        }
+
+                        allTask.dependsOn(task)
                     }
                 }
             }
         }
     }
 
-    void printInfo() {
+    void printInfo(String appId) {
         if (appVariants.size() > 0) {
             println "\nPlay publishing: ${playConfig.applicationName}"
 
-            for (Map.Entry<String, List<AppVariant>> app : appVariants.entrySet()) {
-                println "\n Package: ${app.key}"
-                for (AppVariant variant : app.value) {
-                    println " Variant: [${variant.flavor.versionCode}]${variant.flavor.name} - ${variant.output.path}"
+            if (appId == null) {
+                for (Map.Entry<String, List<AppVariant>> app : appVariants.entrySet()) {
+                    printVariants(app.key, app.value)
                 }
+            } else {
+                printVariants(appId, appVariants.get(appId))
             }
         } else {
             println "\nNo Play publishing configured.\n"
+        }
+    }
+
+    void printVariants(String appId, List<AppVariant> variants) {
+        println "\n Package: ${appId}"
+        for (AppVariant variant : variants) {
+            println "  (${variant.flavor.versionCode}) '${variant.version}' ${variant.name} -> ${variant.output.name}"
         }
     }
 
@@ -139,67 +200,63 @@ class PlayPublishPlugin implements Plugin<Project> {
     }
 
     void configureVariant(def variant) {
+        DefaultBuildType buildType = variant.buildType
         DefaultProductFlavor flavor = variant.mergedFlavor
         String appId = flavor.applicationId
+        if (buildType.applicationIdSuffix != null)
+            appId += buildType.applicationIdSuffix
 
         AppVariant pub = new AppVariant();
+        pub.name = variant.name
+        pub.flavor = flavor
+        pub.output = variant.outputFile
+        pub.version = flavor.versionName
+        if (buildType.versionNameSuffix != null)
+            pub.version += buildType.versionNameSuffix
+
         if (appVariants.containsKey(appId)) {
             appVariants.get(appId).add(pub)
         } else {
-            List<AppVariant> list = new ArrayList<>()
-            list.add(pub)
-            appVariants.put(appId, list)
-//           publishVariants.put(appId, Lists.asList(pub))
+            appVariants.put(appId, Lists.newArrayList(pub))
         }
 
-        pub.flavor = variant.mergedFlavor
-        pub.output = variant.outputFile
-
-        String taskSuffix = variant.name.capitalize()
-        Task task = project.task('playPublish' + taskSuffix) << {
-            printInfo()
-            publishApk()
-        }
-        task.dependsOn('assemble' + taskSuffix)
     }
 
-    void publishApk() {
+    void publishApk(String appId) {
         try {
             // Create the API service.
             AndroidPublisher service = AndroidPublisherHelper.init(playConfig)
             final Edits edits = service.edits();
 
-            for (String appId : appVariants.keySet()) {
-                // Create a new edit to make changes to this application.
-                Insert editRequest = edits.insert(appId, null);
-                AppEdit edit = editRequest.execute();
-                final String editId = edit.getId();
-                println "App edit created for: ${playConfig.applicationName}"
+            // Create a new edit to make changes to this application.
+            Insert editRequest = edits.insert(appId, null);
+            AppEdit edit = editRequest.execute();
+            final String editId = edit.getId();
+            println "App edit created for: ${playConfig.applicationName}"
 
-                List<Integer> apkVersionCodes = new ArrayList<>();
-                for (AppVariant variant : appVariants.get(appId)) {
-                    // Upload new apk to developer console
-                    final AbstractInputStreamContent apkFile = new FileContent(MIME_TYPE_APK, variant.output)
-                    Upload uploadRequest = edits.apks().upload(appId, editId, apkFile)
-                    Apk apk = uploadRequest.execute();
-                    apkVersionCodes.add(apk.getVersionCode());
-                    println "Version code ${apk.getVersionCode()} has been uploaded"
-                }
-
-                // Assign apk(s) to publish track.
-                Update updateTrackRequest = edits.tracks()
-                        .update(appId, editId, playConfig.publishTrack,
-                                new Track().setVersionCodes(apkVersionCodes));
-                Track updatedTrack = updateTrackRequest.execute();
-                println "Track ${updatedTrack.getTrack()} has been updated."
-
-                // Commit changes for edit.
-                Commit commitRequest = edits.commit(appId, editId);
-                AppEdit appEdit = commitRequest.execute();
-                println "App edit committed for: ${playConfig.applicationName} (${appEdit.getId()})"
+            List<Integer> apkVersionCodes = new ArrayList<>();
+            for (AppVariant variant : appVariants.get(appId)) {
+                // Upload new apk to developer console
+                final AbstractInputStreamContent apkFile = new FileContent(MIME_TYPE_APK, variant.output)
+                Upload uploadRequest = edits.apks().upload(appId, editId, apkFile)
+                Apk apk = uploadRequest.execute();
+                apkVersionCodes.add(apk.getVersionCode());
+                println "Version code ${apk.getVersionCode()} has been uploaded"
             }
+
+            // Assign apk(s) to publish track.
+            Update updateTrackRequest = edits.tracks()
+                    .update(appId, editId, playConfig.publishTrack,
+                            new Track().setVersionCodes(apkVersionCodes));
+            Track updatedTrack = updateTrackRequest.execute();
+            println "Track ${updatedTrack.getTrack()} has been updated."
+
+            // Commit changes for edit.
+            Commit commitRequest = edits.commit(appId, editId);
+            AppEdit appEdit = commitRequest.execute();
+            println "App edit committed for: ${playConfig.applicationName} (${appEdit.getId()})"
         } catch (ex) {
-            println "Exception was thrown while uploading apk to '${playConfig.publishTrack}' track: " + ex
+            println "Error uploading apk to '${playConfig.publishTrack}' track: " + ex
             ex.printStackTrace()
         }
     }

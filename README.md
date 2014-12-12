@@ -1,10 +1,14 @@
-###Gradle Play
-===
+#Gradle Play
+
 Gradle plugin for publishing Android applications using the Google Play Publisher API
 
-```
+## build.gradle
+````
 buildscript {
     dependencies {
+        classpath 'com.android.tools.build:gradle:0.12.+'
+        ...
+        
         classpath files('libraries/gradle-play-0.1.1-SNAPSHOT.jar')
         classpath 'com.google.apis:google-api-services-androidpublisher:v2-rev2-1.19.0'
         classpath 'com.google.api-client:google-api-client-gson:1.19.0'
@@ -13,6 +17,7 @@ buildscript {
     }
 }
 
+apply plugin: 'com.android.application'
 apply plugin: 'play'
 
 android {
@@ -21,9 +26,28 @@ android {
 
 play {
     applicationName "Company-AppName/1.0"
-    publishVariant 'flavorOneRelease', 'flavorTwoRelease', 'flavorThreeRelease'
+    publishVariants 'freeRelease', 'paidRelease'
     publishTrack 'alpha' // can be [production, beta, alpha], defaults to 'alpha'
     serviceEmail '' // add service email
     serviceKey '' // add path to .p12 file
 }
-```
+````
+
+You can also specify just the suffix, which will build all flavors for that build type:
+
+````
+play {
+    ...
+    publishVariants 'release'
+    ...
+}
+````
+(eg. might build _freeX86Release, freeArmRelease, paidX86Release, paidArmRelease_ variants)
+
+## gradle tasks
+````
+playInfo - displays publishing info grouped by application
+playPublish - publishes all configured applications
+````
+The plugin will group apps by package and upload all apks for that app together.
+If there is only one APK for an application, a variant specific task will be created.
