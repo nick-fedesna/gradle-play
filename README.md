@@ -6,7 +6,7 @@ Gradle plugin for publishing Android applications using the Google Play Publishe
 
 - clone repository
 - execute `./gradlew assemble`
-- copy __build/libs/play-0.1.2-SNAPSHOT.jar__ to your project (libraries subfolder used as example below)
+- copy __build/libs/play-0.1.2-SNAPSHOT.jar__ *(eg. libraries/ subfolder below)*
 
 ## Usage
 
